@@ -1,0 +1,140 @@
+.task-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  animation: slideUp 0.4s ease both;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.task-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(79, 172, 254, 0.12);
+}
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.task-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e2235;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+.hours-compare {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+.hours-val {
+  font-weight: 700;
+  color: #1e2235;
+}
+.hours-val.over {
+  color: #ef4444;
+}
+.hours-input {
+  width: 50px;
+  border: 1px solid #4facfe;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+.feedback-box {
+  background: rgba(102, 126, 234, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.feedback-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #667eea;
+  margin-right: 6px;
+}
+.feedback-content {
+  font-size: 12.5px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.task-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.task-show-more {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin-top: 4px;
+  border: 1px solid rgba(79, 172, 254, 0.18);
+  border-radius: 14px;
+  background: rgba(79, 172, 254, 0.08);
+  color: #0369a1;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-show-more:hover {
+  border-color: rgba(79, 172, 254, 0.34);
+  background: rgba(79, 172, 254, 0.14);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+  .task-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .task-card-header {
+    flex-direction: column;
+  }
+
+  .hours-compare {
+    align-items: flex-start;
+  }
+
+  .task-card-actions .btn {
+    flex: 1 1 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .task-card {
+    padding: 14px;
+  }
+
+  .task-card-actions .btn {
+    flex-basis: 100%;
+  }
+
+  .hours-input {
+    width: 72px;
+  }
+}
