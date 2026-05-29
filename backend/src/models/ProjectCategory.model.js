@@ -45,7 +45,6 @@ const ProjectCategorySchema = new mongoose.Schema(
   { timestamps: true, collection: 'project_categories' }
 );
 
-ProjectCategorySchema.index({ slug: 1 });
 ProjectCategorySchema.index({ active: 1, thu_tu: 1 });
 ProjectCategorySchema.index({ deleted_at: 1 });
 

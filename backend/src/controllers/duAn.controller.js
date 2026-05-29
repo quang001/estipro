@@ -16,6 +16,11 @@ const { TRANG_THAI_DU_AN } = require('../config/constants');
 const { tinhChiPhiKyThuat, tinhRuiRo, goiYPhanCong } = require('../utils/estimationEngine');
 const { danhGiaDuAn, tinhGiaDynamic, HE_SO_DO_KHO } = require('../utils/difficultyEngine');
 const { tinhDiemDuAn } = require('../utils/scoringService');
+const {
+  analyzeAiEstimation,
+  buildConfirmedRequirements,
+  mergeAiReviewedDifficulty,
+} = require('../utils/aiService');
 
 const MANAGER_ROLES = new Set(['admin', 'manager']);
 
@@ -191,9 +196,26 @@ async function _getDuAnFull(id) {
   };
 }
 
-async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25) {
+async function loadAiEstimationContext(project = null) {
+  const categories = await ProjectCategory.find({ deleted_at: null, active: true })
+    .sort({ thu_tu: 1, ten_hien_thi: 1 });
+  const categoryIds = categories.map(category => category._id);
+  const fields = await ProjectRequirementField.find({
+    ma_loai_du_an: { $in: categoryIds },
+    active: true,
+  }).sort({ thu_tu: 1, createdAt: 1 });
+
+  return {
+    project: project?.toObject?.() || project || {},
+    categories,
+    fields,
+  };
+}
+
+async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
   try {
     if (!duAn) return null;
+    const { includeAiReviewed = true } = options;
 
     const [khachHang, allNV, phanCong, chiPhiKTDoc, category] = await Promise.all([
       KhachHang.findById(duAn.ma_khach_hang),
@@ -210,7 +232,10 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25) {
       active: true,
     }).sort({ thu_tu: 1 });
 
-    const doKhoResult = danhGiaDuAn(yeuCau, fieldConfigs);
+    const systemDoKhoResult = danhGiaDuAn(yeuCau, fieldConfigs);
+    const doKhoResult = includeAiReviewed
+      ? mergeAiReviewedDifficulty(systemDoKhoResult, yeuCau)
+      : systemDoKhoResult;
     const gioCoBan = category?.base_hours ?? category?.gio_co_ban ?? 8;
     const tongKT = tinhChiPhiKyThuat(category, yeuCau, chiPhiKTDoc?.toObject?.() || null);
     const { pct: pctRuiRo, reasons } = tinhRuiRo(category, yeuCau, diemDoKho);
@@ -455,10 +480,123 @@ exports.uocTinhManual = async (req, res) => {
     });
     if (!margin.ok) return res.status(400).json({ message: margin.message });
 
-    const result = await _autoUocTinh(req.params.id, duAn, margin.value);
+    const result = await _autoUocTinh(req.params.id, duAn, margin.value, { includeAiReviewed: false });
     if (!result) return res.status(500).json({ message: 'Loi tinh uoc tinh' });
 
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.aiEstimateAnalyze = async (req, res) => {
+  try {
+    const duAn = await findActiveProject(req.params.id);
+    if (!duAn) return res.status(404).json({ message: 'Khong tim thay du an' });
+
+    const context = await loadAiEstimationContext(duAn);
+    const proposal = await analyzeAiEstimation(context, {
+      sourceText: req.body?.source_text || '',
+    });
+    res.json(proposal);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.aiEstimateConfirm = async (req, res) => {
+  try {
+    const duAn = await findActiveProject(req.params.id);
+    if (!duAn) return res.status(404).json({ message: 'Khong tim thay du an' });
+
+    const conditions = Array.isArray(req.body?.conditions) ? req.body.conditions : [];
+    if (conditions.length === 0) {
+      return res.status(400).json({ message: 'Can co it nhat mot dieu kien da xac nhan' });
+    }
+
+    const context = await loadAiEstimationContext(duAn);
+    const projectPayload = req.body?.project || {};
+    const requestedCategoryId = objectIdString(projectPayload.ma_loai_du_an || projectPayload.category_id || duAn.loai_du_an);
+    const selectedCategory = context.categories.find(category => objectIdString(category._id) === requestedCategoryId);
+    if (!selectedCategory) {
+      return res.status(400).json({ message: 'Loai du an AI de xuat khong hop le hoac dang bi tat' });
+    }
+
+    const targetFields = context.fields.filter(field => objectIdString(field.ma_loai_du_an) === objectIdString(selectedCategory._id));
+    const nextRequirements = buildConfirmedRequirements({
+      existingYeuCau: duAn.yeu_cau || {},
+      conditions,
+      fields: targetFields,
+      project: projectPayload,
+    });
+
+    const payload = {
+      loai_du_an: selectedCategory._id,
+      yeu_cau: nextRequirements,
+      updated_by: req.user?._id || null,
+    };
+
+    if (typeof projectPayload.ten_du_an === 'string' && projectPayload.ten_du_an.trim()) {
+      payload.ten_du_an = projectPayload.ten_du_an.trim();
+    }
+    if (typeof projectPayload.mo_ta === 'string') {
+      payload.mo_ta = projectPayload.mo_ta.trim();
+    }
+    if (projectPayload.deadline) {
+      if (Number.isNaN(Date.parse(projectPayload.deadline))) {
+        return res.status(400).json({ message: 'deadline AI xac nhan khong hop le' });
+      }
+      payload.deadline = projectPayload.deadline;
+    }
+
+    let marginValue = 25;
+    if (req.body?.ty_le_loi_nhuan !== undefined) {
+      const margin = parseNumberField(req.body.ty_le_loi_nhuan, 'ty_le_loi_nhuan', {
+        defaultValue: 25,
+        min: 0,
+        max: 1000,
+      });
+      if (!margin.ok) return res.status(400).json({ message: margin.message });
+      marginValue = margin.value;
+    } else {
+      const currentEstimate = await UocTinhChiPhi.findOne({ ma_du_an: req.params.id }).select('ty_le_loi_nhuan');
+      marginValue = currentEstimate?.ty_le_loi_nhuan ?? 25;
+    }
+
+    const updated = await DuAn.findOneAndUpdate(
+      activeProjectFilter({ _id: req.params.id }),
+      payload,
+      { new: true, runValidators: true }
+    );
+
+    await _autoUocTinh(updated._id, updated, marginValue);
+    res.json(await _getDuAnFull(updated._id));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.aiBriefOcr = async (req, res) => {
+  try {
+    const fileBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+    if (!fileBuffer.length) {
+      return res.status(400).json({ message: 'Can upload anh hoac PDF brief' });
+    }
+
+    const mimeType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
+    if (!allowed.has(mimeType)) {
+      return res.status(400).json({ message: 'Chi ho tro PNG, JPG, WEBP hoac PDF' });
+    }
+
+    const context = await loadAiEstimationContext({});
+    const proposal = await analyzeAiEstimation(context, {
+      media: {
+        mime_type: mimeType,
+        data: fileBuffer.toString('base64'),
+      },
+    });
+    res.json(proposal);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -476,7 +614,7 @@ exports.goiYPhanCong = async (req, res) => {
     ]);
 
     const yeuCau = duAn.yeu_cau || {};
-    const doKhoResult = danhGiaDuAn(yeuCau, fieldConfigs);
+    const doKhoResult = mergeAiReviewedDifficulty(danhGiaDuAn(yeuCau, fieldConfigs), yeuCau);
     const gioCoBan = category?.base_hours ?? category?.gio_co_ban ?? 8;
     const hesoDoKho = HE_SO_DO_KHO[doKhoResult.muc_do_tong_the] || 1.0;
     const hesoDeadline = { binh_thuong: 1.0, gap: 1.2, sieu_gap: 1.5 }[yeuCau.muc_do_gap] || 1.0;

@@ -348,6 +348,16 @@ export const backendApi = {
   deleteProject: (id) => api.delete(`/du-an/${id}`).then((res) => res.data),
   updateProjectStatus: (id, trang_thai) => api.patch(`/du-an/${id}/trang-thai`, { trang_thai }).then((res) => res.data),
   estimateProject: (id, ty_le_loi_nhuan = 25) => api.post(`/du-an/${id}/uoc-tinh`, { ty_le_loi_nhuan }).then((res) => res.data),
+  analyzeProjectAi: (id) => api.post(`/du-an/${id}/ai-estimation/analyze`, {}, { timeout: 60000 }).then((res) => res.data),
+  confirmProjectAi: (id, payload) => api.post(`/du-an/${id}/ai-estimation/confirm`, payload, { timeout: 60000 }).then((res) => res.data),
+  analyzeBriefImage: (file) => api.post("/du-an/ai-estimation/ocr", file, {
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "X-File-Name": encodeURIComponent(file.name || "brief"),
+    },
+    transformRequest: [(body) => body],
+    timeout: 90000,
+  }).then((res) => res.data),
   suggestAssignments: (id) => api.get(`/du-an/${id}/goi-y-phan-cong`).then((res) => res.data),
   assignEmployee: (projectId, payload) => api.post(`/du-an/${projectId}/phan-cong`, payload).then((res) => res.data),
   updateAssignment: (projectId, assignmentId, payload) => api.put(`/du-an/${projectId}/phan-cong/${assignmentId}`, payload).then((res) => res.data),

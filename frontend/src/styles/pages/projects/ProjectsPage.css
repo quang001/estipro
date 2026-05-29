@@ -150,6 +150,13 @@
   flex-wrap: wrap;
 }
 
+.success-card {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
+  font-weight: 800;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -185,6 +192,30 @@
 }
 .ai-modal {
   width: min(560px, 100%);
+}
+
+.cost-estimate-modal {
+  width: min(620px, 100%);
+}
+
+.cost-confirm-box {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.16);
+}
+
+.cost-confirm-box strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.cost-confirm-box span {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .modal-header {
   display: flex;
@@ -262,6 +293,25 @@
   font-size: 13px;
   font-weight: 600;
   color: #1e2235;
+}
+
+.brief-upload-box {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px !important;
+  min-height: 46px;
+  border: 1px dashed rgba(14, 165, 233, 0.32);
+  border-radius: 14px;
+  background: rgba(14, 165, 233, 0.06);
+  color: #075985 !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  cursor: pointer;
+}
+
+.brief-upload-box input {
+  display: none;
 }
 .category-select-preview {
   display: grid;

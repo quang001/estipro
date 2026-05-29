@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOutletContext } from "react-router-dom";
-import { Bot, Eye, GripVertical, Plus, Sparkles, WandSparkles, X } from "lucide-react";
+import { Bot, Calculator, Eye, GripVertical, Plus, Upload, X } from "lucide-react";
 import RoleGate from "../../components/common/RoleGate";
+import AiEstimationModal from "../../components/projects/AiEstimationModal";
 import {
   PROJECT_STATUSES,
   ROLES,
@@ -68,9 +69,25 @@ export default function ProjectsPage() {
   const [requirementValues, setRequirementValues] = useState({});
   const [requirementLoading, setRequirementLoading] = useState(false);
 
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costModal, setCostModal] = useState({
+    open: false,
+    project: null,
+    loading: false,
+    result: null,
+    error: "",
+  });
+  const [briefOcrLoading, setBriefOcrLoading] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState("");
+  const [aiModal, setAiModal] = useState({
+    open: false,
+    mode: "project",
+    projectId: null,
+    loading: false,
+    saving: false,
+    proposal: null,
+    error: "",
+  });
   const [actionError, setActionError] = useState("");
 
   const loadData = async () => {
@@ -102,6 +119,12 @@ export default function ProjectsPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [deny]);
+
+  useEffect(() => {
+    if (!actionSuccess) return undefined;
+    const timer = window.setTimeout(() => setActionSuccess(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [actionSuccess]);
 
   useEffect(() => {
     if (!projectForm.categoryId || !createOpen) return;
@@ -138,7 +161,6 @@ export default function ProjectsPage() {
   }, [createOpen, projectForm.categoryId]);
 
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedProjectId) || projects[0], [projects, selectedProjectId]);
-  const selectedCategory = useMemo(() => categories.find((category) => category._id === projectForm.categoryId), [categories, projectForm.categoryId]);
 
   if (deny)
     return (
@@ -198,23 +220,163 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleAiEstimate = async () => {
+  const handleRecalculateCost = async () => {
     const source = selectedProject || projects[0];
     if (!source) return;
-    setAiOpen(true);
-    setAiLoading(true);
-    setAiResult(null);
+    setCostModal({
+      open: true,
+      project: source,
+      loading: false,
+      result: null,
+      error: "",
+    });
+  };
+
+  const confirmRecalculateCost = async () => {
+    const source = costModal.project || selectedProject || projects[0];
+    if (!source) return;
+    setCostLoading(true);
+    setCostModal((current) => ({ ...current, loading: true, error: "", result: null }));
     setActionError("");
+    setActionSuccess("");
 
     try {
       const result = await backendApi.estimateProject(source.id);
-      setAiResult({ projectName: source.name, ...result });
       const refreshed = await backendApi.project(source.id);
       setProjects((prev) => prev.map((project) => (project.id === source.id ? mapProject(refreshed) : project)));
+      setCostModal((current) => ({
+        ...current,
+        loading: false,
+        result: { projectName: source.name, ...result },
+      }));
     } catch (err) {
-      setAiResult({ projectName: source.name, error: getErrorMessage(err, "Không chạy được ước tính") });
+      setCostModal((current) => ({
+        ...current,
+        loading: false,
+        error: getErrorMessage(err, "Khong chay duoc tinh lai chi phi"),
+      }));
     } finally {
-      setAiLoading(false);
+      setCostLoading(false);
+    }
+  };
+
+  const handleAiEstimate = async () => {
+    const source = selectedProject || projects[0];
+    if (!source) return;
+    setAiModal({
+      open: true,
+      mode: "project",
+      projectId: source.id,
+      loading: true,
+      saving: false,
+      proposal: null,
+      error: "",
+    });
+    setActionError("");
+    setActionSuccess("");
+
+    try {
+      const proposal = await backendApi.analyzeProjectAi(source.id);
+      setAiModal((current) => ({ ...current, loading: false, proposal }));
+    } catch (err) {
+      setAiModal((current) => ({
+        ...current,
+        loading: false,
+        error: getErrorMessage(err, "Khong phan tich duoc bang AI"),
+      }));
+    }
+  };
+
+  const applyAiProposalToCreateForm = ({ project = {}, conditions = [] }) => {
+    const nextRequirementValues = {};
+    conditions.forEach((condition) => {
+      if (!condition.is_new && condition.field_key) {
+        nextRequirementValues[condition.field_key] = condition.value;
+      }
+    });
+
+    nextRequirementValues.ai_reviewed_conditions = conditions.map((condition, index) => ({
+      field_key: condition.field_key || "",
+      label: condition.label || condition.field_key || `Dieu kien ${index + 1}`,
+      value: condition.value ?? "",
+      is_new: Boolean(condition.is_new || !condition.field_key),
+      difficulty_score: Number(condition.difficulty_score) || 2,
+      difficulty_level: condition.difficulty_level || "trung_binh",
+      difficulty_effective_score: Math.min(Number(condition.difficulty_score) || 2, 4),
+      reason: condition.reason || "",
+    }));
+    nextRequirementValues.ai_confirmed_at = new Date().toISOString();
+
+    setProjectForm((current) => ({
+      ...current,
+      name: project.ten_du_an || current.name,
+      categoryId: project.ma_loai_du_an || current.categoryId,
+      deadline: project.deadline ? String(project.deadline).slice(0, 10) : current.deadline,
+      urgency: project.muc_do_gap || current.urgency,
+      description: project.mo_ta || current.description,
+    }));
+    setRequirementValues((current) => ({
+      ...current,
+      ...nextRequirementValues,
+      muc_do_gap: project.muc_do_gap || current.muc_do_gap || "binh_thuong",
+    }));
+    setActionSuccess("Da ap dung ket qua AI vao form tao du an");
+  };
+
+  const handleAiConfirm = async (payload) => {
+    if (aiModal.mode === "create") {
+      applyAiProposalToCreateForm(payload);
+      setAiModal((current) => ({ ...current, open: false, saving: false }));
+      return;
+    }
+
+    if (!aiModal.projectId) return;
+    setAiModal((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const updated = await backendApi.confirmProjectAi(aiModal.projectId, payload);
+      const mapped = mapProject(updated);
+      setProjects((prev) => prev.map((project) => (project.id === mapped.id ? mapped : project)));
+      setSelectedProjectId(mapped.id);
+      setAiModal((current) => ({ ...current, open: false, saving: false }));
+      setActionSuccess("Da xac nhan AI va tinh lai chi phi");
+    } catch (err) {
+      setAiModal((current) => ({
+        ...current,
+        saving: false,
+        error: getErrorMessage(err, "Khong luu duoc ket qua AI"),
+      }));
+    }
+  };
+
+  const handleBriefImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setBriefOcrLoading(true);
+    setActionError("");
+    setActionSuccess("");
+    setAiModal({
+      open: true,
+      mode: "create",
+      projectId: null,
+      loading: true,
+      saving: false,
+      proposal: null,
+      error: "",
+    });
+
+    try {
+      const proposal = await backendApi.analyzeBriefImage(file);
+      setAiModal((current) => ({ ...current, loading: false, proposal }));
+    } catch (err) {
+      setAiModal((current) => ({
+        ...current,
+        loading: false,
+        error: getErrorMessage(err, "Khong doc duoc file brief"),
+      }));
+    } finally {
+      setBriefOcrLoading(false);
     }
   };
 
@@ -316,8 +478,11 @@ export default function ProjectsPage() {
           <p className="page-subtitle">Dữ liệu lấy từ dự án, khách hàng, loại dự án và form yêu cầu động theo loại dự án.</p>
         </div>
         <div className="projects-actions">
+          <button className="btn btn-secondary ripple" onClick={handleRecalculateCost} disabled={!projects.length || costLoading} type="button">
+            <Calculator size={16} /> {costLoading ? "Dang tinh" : "Tinh lai chi phi"}
+          </button>
           <button className="btn btn-secondary ripple" onClick={handleAiEstimate} disabled={!projects.length} type="button">
-            <Bot size={16} /> Ước tính lại
+            <Bot size={16} /> Uoc tinh bang AI
           </button>
           <button className="btn btn-primary ripple" onClick={() => setCreateOpen(true)} type="button">
             <Plus size={16} /> Tạo dự án
@@ -328,6 +493,7 @@ export default function ProjectsPage() {
       {loading && <div className="card">Đang tải dữ liệu dự án từ backend...</div>}
       {error && <div className="card error-card">{error}</div>}
       {actionError && <div className="card error-card">{actionError}</div>}
+      {actionSuccess && <div className="card success-card">{actionSuccess}</div>}
 
       {!loading && !error && (
         <div className="kanban-board">
@@ -507,6 +673,13 @@ export default function ProjectsPage() {
                 />
               </label>
 
+              <label className="brief-upload-box">
+                <Upload size={16} />
+                <span>Upload anh/PDF brief</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={handleBriefImageUpload} />
+              </label>
+              {briefOcrLoading ? <div className="project-form-note">Dang doc brief bang AI... <WaveLoader /></div> : null}
+
               {requirementLoading && <div className="project-form-note">Đang tải form yêu cầu theo loại dự án...</div>}
               {!requirementLoading && requirementFields.length > 0 && (
                 <div className="requirement-panel">
@@ -530,74 +703,104 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {aiOpen && (
-        <div className="modal-backdrop" onClick={() => setAiOpen(false)}>
-          <div className="modal-card ai-modal" onClick={(event) => event.stopPropagation()}>
+      {costModal.open ? (
+        <div className="modal-backdrop" onClick={() => setCostModal((current) => ({ ...current, open: false }))}>
+          <div className="modal-card cost-estimate-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h2>
-                  <Sparkles size={18} /> Ước tính lại chi phí
+                  <Calculator size={18} /> Tinh lai chi phi
                 </h2>
-                <p> Tên dự án: {selectedProject?.name || "Dự án"}</p>
+                <p>{costModal.project?.name || selectedProject?.name || "Du an"}</p>
               </div>
-              <button className="btn btn-ghost btn-sm ripple" onClick={() => setAiOpen(false)} type="button">
+              <button className="btn btn-ghost btn-sm ripple" type="button" onClick={() => setCostModal((current) => ({ ...current, open: false }))}>
                 <X size={18} />
               </button>
             </div>
 
-            {aiLoading ? (
+            {costModal.loading ? (
               <div className="ai-loading-card">
-                <WandSparkles size={20} />
+                <Calculator size={20} />
                 <div>
-                  <div className="ai-loading-title">Đang chạy ước tính...</div>
-                  <div className="ai-loading-subtitle">Backend tính giờ công, chi phí kỹ thuật, rủi ro và giá đề xuất</div>
+                  <div className="ai-loading-title">Dang tinh lai chi phi...</div>
+                  <div className="ai-loading-subtitle">Chi dung dieu kien he thong hien co, khong cong dieu kien AI moi</div>
                 </div>
                 <WaveLoader />
               </div>
-            ) : aiResult?.error ? (
-              <div className="form-error">{aiResult.error}</div>
-            ) : (
+            ) : costModal.error ? (
+              <div className="form-error">{costModal.error}</div>
+            ) : costModal.result ? (
               <>
                 <div className="ai-summary">
                   <div className="ai-summary-item">
-                    <span>Dự án</span>
-                    <strong>{aiResult?.projectName || "Chưa có dữ liệu"}</strong>
+                    <span>Du an</span>
+                    <strong>{costModal.result.projectName}</strong>
                   </div>
                   <div className="ai-summary-item">
-                    <span>Giá đề xuất</span>
-                    <strong>{formatVnd(aiResult?.gia_de_xuat || 0)}</strong>
+                    <span>Gia de xuat</span>
+                    <strong>{formatVnd(costModal.result.gia_de_xuat || 0)}</strong>
                   </div>
                   <div className="ai-summary-item">
-                    <span>Giờ ước tính</span>
-                    <strong>{aiResult?.tong_gio_cong ?? 0}h</strong>
+                    <span>Gio uoc tinh</span>
+                    <strong>{costModal.result.tong_gio_cong ?? 0}h</strong>
                   </div>
                   <div className="ai-summary-item">
-                    <span>Chi phí dự kiến</span>
-                    <strong>{formatVnd(aiResult?.tong_chi_phi_du_kien || 0)}</strong>
+                    <span>Chi phi du kien</span>
+                    <strong>{formatVnd(costModal.result.tong_chi_phi_du_kien || 0)}</strong>
                   </div>
                   <div className="ai-summary-item">
-                    <span>Rủi ro</span>
-                    <strong>{aiResult?.phan_tram_rui_ro ?? 0}%</strong>
+                    <span>Rui ro</span>
+                    <strong>{costModal.result.phan_tram_rui_ro ?? 0}%</strong>
                   </div>
                   <div className="ai-summary-item">
-                    <span>Độ khó</span>
-                    <strong>{aiResult?.do_kho?.muc_do_tong_the || aiResult?.do_kho?.muc_do || "Chưa đánh giá"}</strong>
+                    <span>Do kho</span>
+                    <strong>{costModal.result.do_kho?.muc_do_tong_the || costModal.result.do_kho?.muc_do || "Chua danh gia"}</strong>
                   </div>
                 </div>
-
                 <div className="modal-actions">
-                  <button className="btn btn-secondary ripple" onClick={handleAiEstimate} type="button">
-                    Chạy lại
+                  <button className="btn btn-secondary ripple" type="button" onClick={confirmRecalculateCost} disabled={costLoading}>
+                    Chay lai
                   </button>
-                  <button className="btn btn-primary ripple" onClick={() => setAiOpen(false)} type="button">
-                    Đóng
+                  <button className="btn btn-primary ripple" type="button" onClick={() => setCostModal((current) => ({ ...current, open: false }))}>
+                    Dong
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="cost-confirm-box">
+                  <strong>Xac nhan tinh lai bang thuat toan noi bo?</strong>
+                  <span>He thong se tinh theo cac dieu kien cau hinh san co cua loai du an. Cac dieu kien moi do AI phat hien se khong duoc cong vao lan tinh nay.</span>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn btn-secondary ripple" type="button" onClick={() => setCostModal((current) => ({ ...current, open: false }))}>
+                    Huy
+                  </button>
+                  <button className="btn btn-primary ripple" type="button" onClick={confirmRecalculateCost} disabled={costLoading}>
+                    <Calculator size={16} /> Tinh lai
                   </button>
                 </div>
               </>
             )}
           </div>
         </div>
-      )}
+      ) : null}
+
+      {aiModal.open ? (
+        <AiEstimationModal
+          title={aiModal.mode === "create" ? "Doc brief bang AI" : "Uoc tinh bang AI"}
+          proposal={aiModal.proposal}
+          categories={categories}
+          loading={aiModal.loading}
+          saving={aiModal.saving}
+          error={aiModal.error}
+          onClose={() => setAiModal((current) => ({ ...current, open: false }))}
+          onRetry={aiModal.mode === "project" ? handleAiEstimate : undefined}
+          onConfirm={handleAiConfirm}
+          confirmLabel={aiModal.mode === "create" ? "Ap dung vao form" : "Xac nhan va tinh gia"}
+          allowProjectFields
+        />
+      ) : null}
     </div>
   );
 }

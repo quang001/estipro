@@ -393,7 +393,7 @@ a {
   animation: fadeIn 180ms ease both;
 }
 .modal-card {
-  width: min(720px, 96vw);
+  width: min(960px, 96vw);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
   border: 1px solid rgba(255, 255, 255, 0.6);

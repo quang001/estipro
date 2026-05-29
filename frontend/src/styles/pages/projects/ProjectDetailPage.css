@@ -105,6 +105,13 @@
   gap: 8px;
 }
 
+.cost-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .project-detail-page .detail-main,
 .project-detail-page .detail-cost-card {
   overflow: visible;
@@ -640,6 +647,14 @@
   text-align: right;
 }
 
+.detail-req-item.ai-reviewed span {
+  color: #047857;
+}
+
+.detail-req-item.ai-reviewed strong {
+  color: #0f766e;
+}
+
 .detail-full-btn {
   justify-content: center;
 }
@@ -926,6 +941,15 @@
 
   .detail-actions .btn {
     flex: 1 1 150px;
+  }
+
+  .cost-card-actions {
+    width: 100%;
+  }
+
+  .cost-card-actions .btn {
+    flex: 1 1 160px;
+    justify-content: center;
   }
 
   .workflow-card {

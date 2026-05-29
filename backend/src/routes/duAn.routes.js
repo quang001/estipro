@@ -1,4 +1,5 @@
-const router = require('express').Router();
+const express = require('express');
+const router = express.Router();
 const auth = require('../middlewares/auth.middleware');
 const { requireManagerOrAdmin } = require('../middlewares/auth.middleware');
 const { createProjectLimiter } = require('../middlewares/rateLimiter.middleware');
@@ -32,6 +33,14 @@ router.delete('/:id', ...requireManagerOrAdmin, validateObjectIdParam('id'), ctr
 router.patch('/:id/trang-thai', auth, validateObjectIdParam('id'), ctrl.changeTrangThai);
 
 // Estimation and assignments
+router.post(
+  '/ai-estimation/ocr',
+  ...requireManagerOrAdmin,
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'], limit: '10mb' }),
+  ctrl.aiBriefOcr
+);
+router.post('/:id/ai-estimation/analyze', ...requireManagerOrAdmin, validateObjectIdParam('id'), ctrl.aiEstimateAnalyze);
+router.post('/:id/ai-estimation/confirm', ...requireManagerOrAdmin, validateObjectIdParam('id'), ctrl.aiEstimateConfirm);
 router.post('/:id/uoc-tinh', ...requireManagerOrAdmin, validateObjectIdParam('id'), ctrl.uocTinhManual);
 router.get('/:id/goi-y-phan-cong', auth, validateObjectIdParam('id'), ctrl.goiYPhanCong);
 router.post('/:id/phan-cong', ...requireManagerOrAdmin, validateObjectIdParam('id'), ctrl.themPhanCong);

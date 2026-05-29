@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Ban,
+  Bot,
   Calculator,
   Check,
   CheckCircle2,
@@ -35,6 +36,7 @@ import {
   roleLabel,
   STATUS_LABELS,
 } from "../../services/api";
+import AiEstimationModal from "../../components/projects/AiEstimationModal";
 import "../../styles/pages/projects/ProjectDetailPage.css";
 
 const WORKFLOW = PROJECT_STATUSES.filter((item) => !["cancelled"].includes(item.key));
@@ -200,7 +202,7 @@ function DifficultyChip({ difficulty }) {
   );
 }
 
-function CostBreakdown({ estimate, profit, setProfit, onEstimate, busy, disabled }) {
+function CostBreakdown({ estimate, profit, setProfit, onEstimate, onAiEstimate, busy, disabled }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profit);
 
@@ -221,9 +223,14 @@ function CostBreakdown({ estimate, profit, setProfit, onEstimate, busy, disabled
           <div className="card-title"><CircleDollarSign size={16} /> Ước tính chi phí</div>
           <div className="card-subtitle">Backend tính theo yêu cầu động, chi phí kỹ thuật, rủi ro và phân công thực tế.</div>
         </div>
-        <button className="btn btn-secondary btn-sm ripple" type="button" onClick={() => onEstimate()} disabled={busy === "estimate"}>
-          <RefreshCw size={14} /> Tính lại
-        </button>
+        <div className="cost-card-actions">
+          <button className="btn btn-secondary btn-sm ripple" type="button" onClick={() => onEstimate()} disabled={busy === "estimate" || disabled}>
+            <RefreshCw size={14} /> Tính lại
+          </button>
+          <button className="btn btn-secondary btn-sm ripple" type="button" onClick={onAiEstimate} disabled={busy === "ai-estimation" || disabled}>
+            <Bot size={14} /> Ước tính bằng AI
+          </button>
+        </div>
       </div>
 
       <div className="cost-breakdown-grid">
@@ -318,14 +325,22 @@ function statusAction(status) {
 }
 
 function RequirementList({ values }) {
-  const entries = Object.entries(values || {}).filter(([, value]) => value !== false && value !== "" && value !== null && value !== undefined);
-  if (!entries.length) return <div className="detail-empty">Dự án chưa có yêu cầu chi tiết.</div>;
+  const reviewedConditions = Array.isArray(values?.ai_reviewed_conditions) ? values.ai_reviewed_conditions : [];
+  const hiddenKeys = new Set(["ai_reviewed_conditions", "ai_confirmed_at"]);
+  const entries = Object.entries(values || {}).filter(([key, value]) => !hiddenKeys.has(key) && value !== false && value !== "" && value !== null && value !== undefined);
+  if (!entries.length && !reviewedConditions.length) return <div className="detail-empty">Dự án chưa có yêu cầu chi tiết.</div>;
   return (
     <div className="detail-requirements">
       {entries.map(([key, value]) => (
         <div key={key} className="detail-req-item">
           <span>{key.replaceAll("_", " ")}</span>
           <strong>{Array.isArray(value) ? value.join(", ") : value === true ? "Có" : String(value)}</strong>
+        </div>
+      ))}
+      {reviewedConditions.map((item, index) => (
+        <div key={`${item.field_key || item.label || "ai"}-${index}`} className="detail-req-item ai-reviewed">
+          <span>{item.label || item.field_key || "AI condition"}</span>
+          <strong>{displayValue(item.value)} · {item.difficulty_score || item.difficulty_effective_score || 0}đ</strong>
         </div>
       ))}
     </div>
@@ -803,6 +818,7 @@ export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [employees, setEmployees] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [scoreHistory, setScoreHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -811,20 +827,29 @@ export default function ProjectDetailPage() {
   const [modal, setModal] = useState(null);
   const [profit, setProfit] = useState(25);
   const [busy, setBusy] = useState("");
+  const [aiModal, setAiModal] = useState({
+    open: false,
+    loading: false,
+    saving: false,
+    proposal: null,
+    error: "",
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [projectDoc, employeeDocs, suggestionData, historyData] = await Promise.all([
+      const [projectDoc, employeeDocs, categoryDocs, suggestionData, historyData] = await Promise.all([
         backendApi.project(id),
         backendApi.employees(),
+        backendApi.categories(),
         backendApi.suggestAssignments(id).catch(() => ({ goi_y: [] })),
         backendApi.projectScoreHistory(id).catch(() => []),
       ]);
       setProject(projectDoc);
       setProfit(projectDoc?.uoc_tinh?.ty_le_loi_nhuan ?? 25);
       setEmployees(employeeDocs.map(mapEmployee));
+      setCategories(categoryDocs || []);
       setSuggestions(suggestionData?.goi_y || projectDoc?.uoc_tinh?.phan_cong_goi_y || []);
       setScoreHistory(historyData || []);
     } catch (err) {
@@ -875,12 +900,52 @@ export default function ProjectDetailPage() {
     setError("");
     try {
       await backendApi.estimateProject(id, numberInput(selectedProfit));
-      setToast("Đã chạy lại ước tính");
+      setToast("Đã tính lại bằng thuật toán nội bộ");
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err, "Không chạy được ước tính"));
     } finally {
       setBusy("");
+    }
+  };
+
+  const runAiEstimate = async () => {
+    setBusy("ai-estimation");
+    setAiModal({
+      open: true,
+      loading: true,
+      saving: false,
+      proposal: null,
+      error: "",
+    });
+    setError("");
+    try {
+      const proposal = await backendApi.analyzeProjectAi(id);
+      setAiModal((current) => ({ ...current, loading: false, proposal }));
+    } catch (err) {
+      setAiModal((current) => ({
+        ...current,
+        loading: false,
+        error: getErrorMessage(err, "Không phân tích được bằng AI"),
+      }));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const confirmAiEstimate = async (payload) => {
+    setAiModal((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      await backendApi.confirmProjectAi(id, { ...payload, ty_le_loi_nhuan: numberInput(profit) });
+      setToast("Đã xác nhận AI và tính lại chi phí");
+      await loadData();
+      setAiModal((current) => ({ ...current, open: false, saving: false }));
+    } catch (err) {
+      setAiModal((current) => ({
+        ...current,
+        saving: false,
+        error: getErrorMessage(err, "Không lưu được kết quả AI"),
+      }));
     }
   };
 
@@ -969,6 +1034,7 @@ export default function ProjectDetailPage() {
             profit={profit}
             setProfit={setProfit}
             onEstimate={runEstimate}
+            onAiEstimate={runAiEstimate}
             busy={busy}
             disabled={isFinished}
           />
@@ -1125,6 +1191,21 @@ export default function ProjectDetailPage() {
         </aside>
       </div>
 
+      {aiModal.open ? (
+        <AiEstimationModal
+          title="Ước tính bằng AI"
+          proposal={aiModal.proposal}
+          categories={categories}
+          loading={aiModal.loading}
+          saving={aiModal.saving}
+          error={aiModal.error}
+          onClose={() => setAiModal((current) => ({ ...current, open: false }))}
+          onRetry={runAiEstimate}
+          onConfirm={confirmAiEstimate}
+          confirmLabel="Xác nhận và tính giá"
+          allowProjectFields
+        />
+      ) : null}
       {modal === "assignment" ? <AssignmentModal project={project} employees={employees} suggestions={suggestions} onSaved={loadData} onClose={() => setModal(null)} /> : null}
       {modal === "technical" ? <TechnicalCostModal project={project} onSaved={loadData} onClose={() => setModal(null)} /> : null}
       {modal === "complete" ? <CompleteModal project={project} onSaved={loadData} onClose={() => setModal(null)} /> : null}

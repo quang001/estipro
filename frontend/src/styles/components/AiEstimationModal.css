@@ -1,0 +1,349 @@
+.ai-estimation-backdrop {
+  z-index: 260;
+}
+
+.ai-estimation-modal {
+  width: min(1180px, calc(100vw - 32px));
+  max-height: calc(100dvh - 28px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ai-estimation-header {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.ai-estimation-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 24px 18px;
+  scrollbar-gutter: stable;
+  scrollbar-color: #7dd3fc rgba(14, 165, 233, 0.12);
+  scrollbar-width: auto;
+}
+
+.ai-estimation-body::-webkit-scrollbar,
+.ai-extracted-text p::-webkit-scrollbar {
+  width: 16px;
+}
+
+.ai-estimation-body::-webkit-scrollbar-track,
+.ai-extracted-text p::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.14);
+}
+
+.ai-estimation-body::-webkit-scrollbar-thumb,
+.ai-extracted-text p::-webkit-scrollbar-thumb {
+  border: 3px solid rgba(14, 165, 233, 0.14);
+  border-radius: 999px;
+  background: #7dd3fc;
+  background-clip: content-box;
+}
+
+.ai-project-grid,
+.ai-extracted-text,
+.ai-condition-head,
+.ai-condition-list,
+.ai-note-strip {
+  margin-bottom: 16px;
+}
+
+.ai-project-grid {
+  margin-top: 0;
+}
+
+.ai-estimation-loading {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 64px 24px;
+  color: #1f2937;
+}
+
+.ai-estimation-loading strong {
+  font-size: 16px;
+}
+
+.ai-estimation-bars {
+  display: inline-flex;
+  align-items: end;
+  gap: 6px;
+  height: 30px;
+}
+
+.ai-estimation-bars span {
+  width: 8px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #0ea5e9, #10b981);
+  animation: aiBarPulse 0.9s ease-in-out infinite;
+}
+
+.ai-project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.ai-project-grid label,
+.ai-condition-row label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.ai-project-span {
+  grid-column: 1 / -1;
+}
+
+.ai-extracted-text {
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(14, 165, 233, 0.07);
+  border: 1px solid rgba(14, 165, 233, 0.14);
+}
+
+.ai-extracted-text span,
+.ai-note-strip strong {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ai-extracted-text p {
+  max-height: 116px;
+  margin: 0;
+  overflow: auto;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ai-condition-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.ai-condition-head div {
+  display: grid;
+  gap: 2px;
+}
+
+.ai-condition-head strong {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.ai-condition-head span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.ai-condition-list {
+  min-height: 220px;
+  overflow: visible;
+  overflow-x: hidden;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-right: 4px;
+  padding-bottom: 8px;
+}
+
+.ai-condition-row {
+  display: grid;
+  grid-template-columns: minmax(340px, 1fr) minmax(420px, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.ai-condition-row.is-new {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.ai-condition-main,
+.ai-condition-meta {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(140px, 0.7fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.ai-condition-meta {
+  grid-template-columns: minmax(130px, 0.55fr) minmax(150px, 1fr) minmax(92px, auto);
+  align-items: end;
+}
+
+.ai-condition-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.ai-condition-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ai-condition-badge.known {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.ai-condition-badge.new {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.ai-condition-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.ai-option-chip {
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ai-option-chip.active {
+  color: #075985;
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.36);
+}
+
+.ai-condition-empty,
+.ai-note-strip {
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.ai-condition-empty {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
+.ai-note-strip {
+  display: grid;
+  gap: 4px;
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.16);
+}
+
+.ai-note-strip span {
+  color: #475569;
+}
+
+.ai-modal-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  z-index: 2;
+}
+
+@keyframes aiBarPulse {
+  0%,
+  100% {
+    height: 10px;
+    opacity: 0.55;
+  }
+  50% {
+    height: 30px;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 980px) {
+  .ai-condition-row,
+  .ai-condition-main,
+  .ai-condition-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-condition-actions {
+    justify-content: space-between;
+  }
+
+}
+
+@media (max-width: 720px) {
+  .ai-estimation-modal {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 18px;
+  }
+
+  .ai-estimation-header {
+    padding: 16px;
+  }
+
+  .ai-estimation-body {
+    padding: 16px;
+  }
+
+  .ai-project-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-condition-list {
+    min-height: 220px;
+    padding-right: 0;
+  }
+
+  .ai-modal-footer {
+    flex-wrap: wrap;
+    padding: 14px 16px 16px;
+  }
+
+  .ai-modal-footer .btn {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+}

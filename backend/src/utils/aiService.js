@@ -1,4 +1,5 @@
 
+const { danhGiaDuAn, diemSangMucDo } = require('./difficultyEngine');
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
@@ -39,7 +40,11 @@ function sanitize(val) {
   return String(val)
     .replace(/`/g, "'")      // backtick gây lỗi trong template string
     .replace(/\\/g, '/')     // backslash gây lỗi JSON
-    .slice(0, 500);          // giới hạn độ dài
+    .slice(0, 1200);         // giới hạn độ dài prompt AI
+}
+
+function sanitizeShort(val, max = 220) {
+  return sanitize(val).slice(0, max);
 }
 
 // ─── Core caller với đầy đủ log lỗi ─────────────────────────────────────────
@@ -134,6 +139,546 @@ function safeParseJSON(text) {
     console.warn('[AI] Parse JSON thất bại:', e.message.slice(0, 100));
     return null;
   }
+}
+
+function scoreToLevel(score) {
+  const value = Number(score) || 2;
+  if (value <= 1) return 'de';
+  if (value <= 2) return 'trung_binh';
+  if (value <= 3) return 'kho';
+  return 'rat_kho';
+}
+
+function normalizeScore(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return 2;
+  return Math.max(1, Math.min(5, Math.round(value)));
+}
+
+function asPlainId(value) {
+  return value?._id?.toString?.() || value?.toString?.() || '';
+}
+
+function toPlainCategory(category) {
+  const obj = category?.toObject?.() || category || {};
+  return {
+    _id: asPlainId(obj._id),
+    slug: obj.slug,
+    ten_hien_thi: obj.ten_hien_thi,
+    mo_ta: obj.mo_ta || '',
+    base_hours: obj.base_hours,
+    tech_cost_base: obj.tech_cost_base,
+    required_roles: obj.required_roles || [],
+  };
+}
+
+function toPlainField(field) {
+  const obj = field?.toObject?.() || field || {};
+  return {
+    _id: asPlainId(obj._id),
+    ma_loai_du_an: asPlainId(obj.ma_loai_du_an),
+    field_key: obj.field_key,
+    label: obj.label,
+    hint: obj.hint || '',
+    type: obj.type,
+    required: Boolean(obj.required),
+    default_value: obj.default_value,
+    min_value: obj.min_value,
+    max_value: obj.max_value,
+    options: (obj.options || []).map(option => ({
+      value: option.value,
+      label: option.label || String(option.value),
+      muc_do: option.muc_do,
+      diem: option.diem,
+    })),
+    cau_hinh_do_kho_number: obj.cau_hinh_do_kho_number || [],
+    multiselect_rule: obj.multiselect_rule || 'max',
+    active: obj.active !== false,
+  };
+}
+
+function normalizeContext(context = {}) {
+  const categories = (context.categories || []).map(toPlainCategory);
+  const fields = (context.fields || []).map(toPlainField).filter(field => field.active);
+  const fieldsByCategory = {};
+  fields.forEach(field => {
+    const key = asPlainId(field.ma_loai_du_an);
+    if (!fieldsByCategory[key]) fieldsByCategory[key] = [];
+    fieldsByCategory[key].push(field);
+  });
+  return { ...context, categories, fields, fieldsByCategory };
+}
+
+function compactFieldForPrompt(field) {
+  return {
+    field_key: field.field_key,
+    label: field.label,
+    type: field.type,
+    required: field.required,
+    options: field.options?.slice(0, 24).map(option => ({
+      value: option.value,
+      label: option.label,
+      difficulty_score: option.diem,
+      difficulty_level: option.muc_do,
+    })),
+    number_difficulty: field.cau_hinh_do_kho_number?.slice(0, 8).map(range => ({
+      min: range.min,
+      max: range.max,
+      difficulty_score: range.diem,
+      difficulty_level: range.muc_do,
+    })),
+    multiselect_rule: field.multiselect_rule,
+  };
+}
+
+function buildAiEstimationPrompt(context = {}, sourceText = '') {
+  const normalized = normalizeContext(context);
+  const project = normalized.project || {};
+  const currentCategoryId = asPlainId(project.loai_du_an || project.category_id || project.ma_loai_du_an);
+  const categoryBlocks = normalized.categories.map(category => ({
+    id: category._id,
+    slug: category.slug,
+    label: category.ten_hien_thi,
+    fields: (!currentCategoryId || category._id === currentCategoryId)
+      ? (normalized.fieldsByCategory[category._id] || []).map(compactFieldForPrompt)
+      : [],
+  }));
+
+  return [
+    'Ban la AI phan tich yeu cau cho he thong EstiPro.',
+    'Nhiem vu: phan tich brief, xac dinh loai du an, trich xuat dieu kien, danh gia do kho.',
+    'Khong tinh gia, khong dua ra tong tien, khong thay the thuat toan tinh gia hien co.',
+    'Khong hardcode dieu kien. Chi dung cac category va field duoc cung cap trong cau hinh.',
+    'Neu gia tri thuoc field da co cau hinh do kho, hay dung dung do kho trong cau hinh.',
+    'Neu phat hien dieu kien chua co field tuong ung, dua vao new_conditions voi ly do va do kho de xuat 1..5.',
+    'Neu co file anh/pdf dinh kem, hay OCR noi dung brief va dua text doc duoc vao extracted_text.',
+    'Tra ve JSON thuan tuy, khong markdown, khong chain-of-thought.',
+    '',
+    'DU AN HIEN TAI:',
+    JSON.stringify({
+      ten_du_an: project.ten_du_an || '',
+      loai_du_an: project.loai_du_an || project.category_id || '',
+      mo_ta: project.mo_ta || '',
+      deadline: project.deadline || '',
+      yeu_cau: project.yeu_cau || {},
+    }),
+    '',
+    'BRIEF/OCR TEXT:',
+    sanitizeShort(sourceText || project.mo_ta || '', 1000),
+    '',
+    'CAU HINH DONG TU DATABASE:',
+    JSON.stringify(categoryBlocks),
+    '',
+    'JSON FORMAT BAT BUOC:',
+    '{',
+    '  "extracted_text": "noi dung OCR/brief doc duoc, neu co",',
+    '  "project": {',
+    '    "ten_du_an": "ten du an neu suy ra duoc",',
+    '    "ma_loai_du_an": "id category phu hop nhat",',
+    '    "loai_du_an_slug": "slug category",',
+    '    "mo_ta": "tom tat brief da chuan hoa",',
+    '    "deadline": "YYYY-MM-DD hoac null",',
+    '    "muc_do_gap": "binh_thuong|gap|sieu_gap"',
+    '  },',
+    '  "conditions": [',
+    '    {',
+    '      "field_key": "field_key co trong cau hinh",',
+    '      "label": "ten hien thi",',
+    '      "value": "gia tri phu hop voi type",',
+    '      "difficulty_score": 1,',
+    '      "difficulty_level": "de|trung_binh|kho|rat_kho",',
+    '      "reason": "ly do ngan gon",',
+    '      "confidence": 0.8',
+    '    }',
+    '  ],',
+    '  "new_conditions": [',
+    '    {',
+    '      "label": "dieu kien moi",',
+    '      "value": "gia tri",',
+    '      "suggested_field_key": "snake_case_key",',
+    '      "difficulty_score": 4,',
+    '      "difficulty_level": "rat_kho",',
+    '      "reason": "vi sao can tinh do kho",',
+    '      "confidence": 0.7',
+    '    }',
+    '  ],',
+    '  "missing_conditions": ["field bat buoc chua thay"],',
+    '  "notes": ["ghi chu ngan gon"]',
+    '}',
+  ].join('\n');
+}
+
+async function callGeminiForAi(prompt, media = null, retryCount = 0) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') return null;
+
+  const model = process.env.GEMINI_MODEL || process.env.AI_GEMINI_MODEL || 'gemini-2.5-flash';
+  const parts = [{ text: String(prompt).trim() }];
+  if (media?.data && media?.mime_type) {
+    parts.push({
+      inline_data: {
+        mime_type: media.mime_type,
+        data: media.data,
+      },
+    });
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096,
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error(`[AI:${model}] ${response.status}: ${body.slice(0, 300)}`);
+      if (response.status === 429 && retryCount < 2) {
+        await delay((retryCount + 1) * 3000);
+        return callGeminiForAi(prompt, media, retryCount + 1);
+      }
+      return null;
+    }
+
+    const data = await response.json();
+    return data?.candidates?.[0]?.content?.parts?.find(part => part.text)?.text || null;
+  } catch (err) {
+    console.error('[AI:gemini] Network error:', err.message);
+    return null;
+  }
+}
+
+async function callOpenAICompatible({ provider, baseUrl, apiKey, model, prompt, media = null }) {
+  if (!apiKey) return null;
+
+  const userContent = media?.data && media?.mime_type
+    ? [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: `data:${media.mime_type};base64,${media.data}` } },
+      ]
+    : prompt;
+
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        ...(provider === 'openrouter' ? {
+          'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost',
+          'X-Title': process.env.OPENROUTER_APP_NAME || 'EstiPro',
+        } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'Return only valid JSON. Do not include markdown.' },
+          { role: 'user', content: userContent },
+        ],
+        temperature: 0.1,
+        max_tokens: 4096,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error(`[AI:${provider}] ${response.status}: ${body.slice(0, 300)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content || null;
+  } catch (err) {
+    console.error(`[AI:${provider}] Network error:`, err.message);
+    return null;
+  }
+}
+
+function getProviderCandidates(media = null) {
+  const explicit = String(process.env.AI_ESTIMATION_PROVIDER || 'auto').toLowerCase();
+  const all = {
+    groq: {
+      provider: 'groq',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      apiKey: process.env.GROQ_API_KEY,
+      model: process.env.GROQ_MODEL || process.env.AI_GROQ_MODEL || 'llama-3.3-70b-versatile',
+      supportsMedia: false,
+    },
+    gemini: {
+      provider: 'gemini',
+      apiKey: process.env.GEMINI_API_KEY,
+      model: process.env.GEMINI_MODEL || process.env.AI_GEMINI_MODEL || 'gemini-2.5-flash',
+      supportsMedia: true,
+    },
+    openrouter: {
+      provider: 'openrouter',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_MODEL || process.env.AI_OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+      supportsMedia: true,
+    },
+    deepseek: {
+      provider: 'deepseek',
+      baseUrl: 'https://api.deepseek.com',
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      model: process.env.DEEPSEEK_MODEL || process.env.AI_DEEPSEEK_MODEL || 'deepseek-v4-flash',
+      supportsMedia: false,
+    },
+  };
+
+  const ordered = media
+    ? ['gemini', 'openrouter']
+    : ['groq', 'gemini', 'openrouter', 'deepseek'];
+
+  const names = explicit !== 'auto' && all[explicit] ? [explicit, ...ordered.filter(name => name !== explicit)] : ordered;
+  return names.map(name => all[name]).filter(cfg => cfg?.apiKey && (!media || cfg.supportsMedia));
+}
+
+async function callAiEstimationModel(context, media = null, sourceText = '') {
+  const prompt = buildAiEstimationPrompt(context, sourceText);
+  const candidates = getProviderCandidates(media);
+
+  for (const cfg of candidates) {
+    const raw = cfg.provider === 'gemini'
+      ? await callGeminiForAi(prompt, media)
+      : await callOpenAICompatible({ ...cfg, prompt, media });
+    const parsed = safeParseJSON(raw);
+    if (parsed) {
+      return { raw: parsed, ai_enabled: true, provider: cfg.provider, model: cfg.model };
+    }
+  }
+
+  return { raw: null, ai_enabled: false, provider: null, model: null };
+}
+
+function findBestCategory(rawProject, context) {
+  const categories = context.categories || [];
+  const currentId = asPlainId(context.project?.loai_du_an || context.project?.category_id);
+  const rawId = asPlainId(rawProject?.ma_loai_du_an || rawProject?.category_id);
+  const rawSlug = String(rawProject?.loai_du_an_slug || rawProject?.slug || '').toLowerCase();
+
+  return categories.find(cat => cat._id === rawId)
+    || categories.find(cat => cat.slug && cat.slug.toLowerCase() === rawSlug)
+    || categories.find(cat => cat._id === currentId)
+    || categories[0]
+    || null;
+}
+
+function coerceFieldValue(value, field) {
+  if (!field) return value;
+  if (field.type === 'number') {
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+    const match = String(value ?? '').match(/-?\d+(\.\d+)?/);
+    return match ? Number(match[0]) : '';
+  }
+  if (field.type === 'boolean') {
+    if (typeof value === 'boolean') return value;
+    return ['true', '1', 'yes', 'co', 'có'].includes(String(value).toLowerCase());
+  }
+  if (field.type === 'multiselect') {
+    if (Array.isArray(value)) return value;
+    if (value === undefined || value === null || value === '') return [];
+    return String(value).split(',').map(item => item.trim()).filter(Boolean);
+  }
+  return value === undefined || value === null ? '' : value;
+}
+
+function getSystemDifficulty(field, value) {
+  if (!field?.field_key) return null;
+  const evaluated = danhGiaDuAn({ [field.field_key]: value }, [field]);
+  const detail = evaluated?.chi_tiet_do_kho?.[0];
+  if (!detail) return null;
+  return {
+    difficulty_score: detail.diem_do_kho || detail.diem || 2,
+    difficulty_level: detail.muc_do || scoreToLevel(detail.diem_do_kho || detail.diem || 2),
+    difficulty_source: 'system',
+  };
+}
+
+function normalizeCondition(rawCondition, field = null, isNew = false) {
+  const value = field ? coerceFieldValue(rawCondition?.value, field) : (rawCondition?.value ?? '');
+  const systemDifficulty = field ? getSystemDifficulty(field, value) : null;
+  const aiScore = normalizeScore(rawCondition?.difficulty_score || rawCondition?.diem || 2);
+  const difficulty = systemDifficulty || {
+    difficulty_score: aiScore,
+    difficulty_level: rawCondition?.difficulty_level || scoreToLevel(aiScore),
+    difficulty_source: isNew ? 'ai_new' : 'ai_proposed',
+  };
+
+  return {
+    temp_id: rawCondition?.temp_id || `${field?.field_key || rawCondition?.suggested_field_key || 'new'}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    field_key: field?.field_key || rawCondition?.field_key || rawCondition?.suggested_field_key || '',
+    label: field?.label || rawCondition?.label || rawCondition?.name || 'Dieu kien moi',
+    type: field?.type || rawCondition?.type || 'text',
+    value,
+    is_new: Boolean(isNew || !field),
+    options: field?.options || [],
+    required: Boolean(field?.required),
+    confidence: Number(rawCondition?.confidence || 0),
+    reason: rawCondition?.reason || '',
+    ...difficulty,
+  };
+}
+
+function appendCurrentProjectConditions(conditions, selectedFields, projectYeuCau = {}) {
+  const existingKeys = new Set(conditions.filter(item => !item.is_new).map(item => item.field_key));
+  selectedFields.forEach(field => {
+    const value = projectYeuCau[field.field_key];
+    if (existingKeys.has(field.field_key)) return;
+    if (value === undefined || value === null || value === '' || value === false) return;
+    if (Array.isArray(value) && value.length === 0) return;
+    conditions.push(normalizeCondition({
+      field_key: field.field_key,
+      value,
+      reason: 'Gia tri hien tai cua du an',
+      confidence: 1,
+    }, field, false));
+  });
+}
+
+function normalizeAiEstimationProposal(aiResult, context, sourceText = '') {
+  const normalizedContext = normalizeContext(context);
+  const raw = aiResult.raw || {};
+  const selectedCategory = findBestCategory(raw.project, normalizedContext);
+  const selectedFields = selectedCategory ? (normalizedContext.fieldsByCategory[selectedCategory._id] || []) : [];
+  const fieldMap = {};
+  selectedFields.forEach(field => { fieldMap[field.field_key] = field; });
+
+  const conditions = [];
+  const rawKnown = Array.isArray(raw.conditions) ? raw.conditions : [];
+  rawKnown.forEach(item => {
+    const field = fieldMap[item.field_key];
+    if (field) conditions.push(normalizeCondition(item, field, false));
+    else if (item?.label || item?.value) conditions.push(normalizeCondition(item, null, true));
+  });
+
+  const rawNew = Array.isArray(raw.new_conditions) ? raw.new_conditions : [];
+  rawNew.forEach(item => {
+    if (item?.label || item?.value) conditions.push(normalizeCondition(item, null, true));
+  });
+
+  appendCurrentProjectConditions(conditions, selectedFields, normalizedContext.project?.yeu_cau || {});
+
+  return {
+    ai_enabled: Boolean(aiResult.ai_enabled),
+    provider: aiResult.provider,
+    model: aiResult.model,
+    extracted_text: raw.extracted_text || sourceText || '',
+    project: {
+      ten_du_an: raw.project?.ten_du_an || normalizedContext.project?.ten_du_an || '',
+      ma_loai_du_an: selectedCategory?._id || '',
+      loai_du_an_slug: selectedCategory?.slug || '',
+      loai_du_an_label: selectedCategory?.ten_hien_thi || '',
+      mo_ta: raw.project?.mo_ta || normalizedContext.project?.mo_ta || '',
+      deadline: raw.project?.deadline || normalizedContext.project?.deadline || null,
+      muc_do_gap: ['binh_thuong', 'gap', 'sieu_gap'].includes(raw.project?.muc_do_gap)
+        ? raw.project.muc_do_gap
+        : (normalizedContext.project?.yeu_cau?.muc_do_gap || 'binh_thuong'),
+    },
+    conditions,
+    missing_conditions: Array.isArray(raw.missing_conditions) ? raw.missing_conditions : [],
+    notes: aiResult.ai_enabled
+      ? (Array.isArray(raw.notes) ? raw.notes : [])
+      : ['Chua cau hinh API key AI, he thong dang tra ve proposal tu du lieu hien co.'],
+  };
+}
+
+async function analyzeAiEstimation(context, { media = null, sourceText = '' } = {}) {
+  const normalized = normalizeContext(context);
+  const aiResult = await callAiEstimationModel(normalized, media, sourceText);
+  return normalizeAiEstimationProposal(aiResult, normalized, sourceText);
+}
+
+function buildConfirmedRequirements({ existingYeuCau = {}, conditions = [], fields = [], project = {} }) {
+  const fieldMap = {};
+  fields.map(toPlainField).forEach(field => { fieldMap[field.field_key] = field; });
+
+  const yeuCau = { ...existingYeuCau };
+  const reviewed = [];
+
+  conditions.forEach((item, index) => {
+    const field = item.field_key ? fieldMap[item.field_key] : null;
+    const value = field ? coerceFieldValue(item.value, field) : (item.value ?? '');
+    const score = normalizeScore(item.difficulty_score || item.diem || 2);
+    const level = item.difficulty_level || scoreToLevel(score);
+
+    if (field && !item.is_new) {
+      yeuCau[field.field_key] = value;
+    }
+
+    if (item.label || item.field_key || value !== '') {
+      reviewed.push({
+        field_key: field?.field_key || item.field_key || '',
+        label: field?.label || item.label || `Dieu kien ${index + 1}`,
+        value,
+        is_new: Boolean(item.is_new || !field),
+        difficulty_score: score,
+        difficulty_level: level,
+        difficulty_effective_score: Math.min(score, 4),
+        reason: item.reason || '',
+      });
+    }
+  });
+
+  if (project?.muc_do_gap) yeuCau.muc_do_gap = project.muc_do_gap;
+  yeuCau.ai_reviewed_conditions = reviewed;
+  yeuCau.ai_confirmed_at = new Date().toISOString();
+
+  return yeuCau;
+}
+
+function mergeAiReviewedDifficulty(doKhoResult, yeuCau = {}) {
+  const reviewed = Array.isArray(yeuCau.ai_reviewed_conditions) ? yeuCau.ai_reviewed_conditions : [];
+  if (reviewed.length === 0) return doKhoResult;
+
+  const chiTiet = Array.isArray(doKhoResult?.chi_tiet_do_kho)
+    ? doKhoResult.chi_tiet_do_kho.map(item => ({ ...item }))
+    : [];
+  const byKey = {};
+  chiTiet.forEach((item, index) => {
+    if (item.field_key) byKey[item.field_key] = index;
+  });
+
+  reviewed.forEach(item => {
+    const score = Math.min(normalizeScore(item.difficulty_effective_score || item.difficulty_score), 4);
+    const detail = {
+      field_key: item.field_key || `ai_new_${chiTiet.length + 1}`,
+      label: item.label || item.field_key || 'Dieu kien AI',
+      gia_tri: item.value,
+      muc_do: item.difficulty_level || diemSangMucDo(score),
+      diem_do_kho: score,
+      ai_reviewed: true,
+      is_new: Boolean(item.is_new),
+      reason: item.reason || '',
+    };
+
+    if (item.field_key && byKey[item.field_key] !== undefined && !item.is_new) {
+      chiTiet[byKey[item.field_key]] = { ...chiTiet[byKey[item.field_key]], ...detail };
+    } else {
+      chiTiet.push(detail);
+    }
+  });
+
+  const total = chiTiet.reduce((sum, item) => sum + (Number(item.diem_do_kho || item.diem) || 0), 0);
+  const avg = chiTiet.length > 0 ? total / chiTiet.length : 1;
+  return {
+    ...doKhoResult,
+    chi_tiet_do_kho: chiTiet,
+    muc_do_tong_the: diemSangMucDo(avg),
+    diem_do_kho_tong: Math.round(avg * 100) / 100,
+  };
 }
 
 // ─── Fallbacks ────────────────────────────────────────────────────────────────
@@ -315,6 +860,9 @@ async function tuVanBaoGia(info, uocTinh) {
 }
 
 module.exports = {
+  analyzeAiEstimation,
+  buildConfirmedRequirements,
+  mergeAiReviewedDifficulty,
   phanTichToanDien,
   phanTichYeuCau,
   danhGiaRuiRo,
