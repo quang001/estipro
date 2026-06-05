@@ -16,6 +16,7 @@ const { TRANG_THAI_DU_AN } = require('../config/constants');
 const { tinhChiPhiKyThuat, tinhRuiRo, goiYPhanCong } = require('../utils/estimationEngine');
 const { danhGiaDuAn, tinhGiaDynamic, HE_SO_DO_KHO } = require('../utils/difficultyEngine');
 const { tinhDiemDuAn } = require('../utils/scoringService');
+const { getSystemSettings } = require('../services/systemSettings.service');
 const {
   analyzeAiEstimation,
   buildConfirmedRequirements,
@@ -212,18 +213,22 @@ async function loadAiEstimationContext(project = null) {
   };
 }
 
-async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
+async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = null, options = {}) {
   try {
     if (!duAn) return null;
     const { includeAiReviewed = true } = options;
 
-    const [khachHang, allNV, phanCong, chiPhiKTDoc, category] = await Promise.all([
+    const [khachHang, allNV, phanCong, chiPhiKTDoc, category, systemSettings] = await Promise.all([
       KhachHang.findById(duAn.ma_khach_hang),
       NhanVien.find({ trang_thai_lam_viec: 'available' }),
       PhanCongDuAn.find({ ma_du_an: duAnId }).populate('ma_nhan_vien'),
       ChiPhiKyThuat.findOne({ ma_du_an: duAnId }),
       ProjectCategory.findOne({ _id: duAn.loai_du_an, deleted_at: null }),
+      getSystemSettings(),
     ]);
+    const profitMargin = tyLeLoiNhuan === null || tyLeLoiNhuan === undefined
+      ? systemSettings.profitMargin
+      : tyLeLoiNhuan;
 
     const yeuCau = duAn.yeu_cau || {};
     const diemDoKho = khachHang?.diem_do_kho || 3;
@@ -237,7 +242,7 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
       ? mergeAiReviewedDifficulty(systemDoKhoResult, yeuCau)
       : systemDoKhoResult;
     const gioCoBan = category?.base_hours ?? category?.gio_co_ban ?? 8;
-    const tongKT = tinhChiPhiKyThuat(category, yeuCau, chiPhiKTDoc?.toObject?.() || null);
+    const tongKT = tinhChiPhiKyThuat(category, yeuCau, chiPhiKTDoc?.toObject?.() || null, systemSettings);
     const { pct: pctRuiRo, reasons } = tinhRuiRo(category, yeuCau, diemDoKho);
 
     const phanCongData = phanCong.map(pc => ({
@@ -251,7 +256,7 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
       muc_do_gap: yeuCau.muc_do_gap || 'binh_thuong',
       phanCong: phanCongData,
       chi_phi_ky_thuat_base: tongKT,
-      ty_le_loi_nhuan: tyLeLoiNhuan,
+      ty_le_loi_nhuan: profitMargin,
     };
 
     let dynResult = tinhGiaDynamic(pricingInput);
@@ -271,7 +276,7 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
 
     const chiPhiRuiRo = Math.round(dynResult.tong_chi_phi_du_kien * pctRuiRo);
     const tongDuKien = dynResult.tong_chi_phi_du_kien + chiPhiRuiRo;
-    const giaDexuat = Math.round(tongDuKien * (1 + tyLeLoiNhuan / 100));
+    const giaDexuat = Math.round(tongDuKien * (1 + profitMargin / 100));
 
     await UocTinhChiPhi.findOneAndUpdate(
       { ma_du_an: duAnId },
@@ -281,7 +286,7 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = 25, options = {}) {
         chi_phi_ky_thuat: dynResult.chi_phi_ky_thuat,
         chi_phi_rui_ro: chiPhiRuiRo,
         tong_chi_phi_du_kien: tongDuKien,
-        ty_le_loi_nhuan: tyLeLoiNhuan,
+        ty_le_loi_nhuan: profitMargin,
         gia_de_xuat: giaDexuat,
         he_so_deadline: dynResult.he_so_deadline,
         phan_tram_rui_ro: Math.round(pctRuiRo * 100),
@@ -474,7 +479,7 @@ exports.uocTinhManual = async (req, res) => {
     if (!duAn) return res.status(404).json({ message: 'Khong tim thay du an' });
 
     const margin = parseNumberField(req.body.ty_le_loi_nhuan, 'ty_le_loi_nhuan', {
-      defaultValue: 25,
+      defaultValue: null,
       min: 0,
       max: 1000,
     });

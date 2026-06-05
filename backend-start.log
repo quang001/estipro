@@ -1,6 +1,0 @@
-
-> estipro-backend@2.0.0 start
-> node src/server.js
-
-🚀 Backend running: http://localhost:5000
-[0mGET /api/health [32m200[0m 7.726 ms - 49[0m

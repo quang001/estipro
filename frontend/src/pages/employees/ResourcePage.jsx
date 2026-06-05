@@ -18,7 +18,7 @@ import "../../styles/pages/employees/ResourcePage.css";
 
 const SKILL_COLORS = { high: "#10b981", medium: "#f59e0b", low: "#ef4444" };
 const LEVEL_COLORS = { junior: "#38bdf8", mid: "#10b981", senior: "#f59e0b", expert: "#8b5cf6" };
-const POINTS_TO_LEVEL = 1000;
+const POINTS_TO_LEVEL = 200;
 const ASSIGNMENT_PREVIEW_LIMIT = 10;
 
 const Stars = ({ value }) => (
@@ -473,7 +473,7 @@ export default function ResourcePage() {
     const total = employees.length;
     const warned = employees.filter((employee) => Number(employee.raw?.so_lan_0_sao || employee.raw?.so_lan_0_sao_lien_tiep || 0) >= 3).length;
     const avgPoints = total ? Math.round(employees.reduce((sum, employee) => sum + Number(employee.points || 0), 0) / total) : 0;
-    const upcomingUpgrade = employees.filter((employee) => employee.level !== "expert" && Number(employee.points || 0) >= 800).length;
+    const upcomingUpgrade = employees.filter((employee) => employee.level !== "expert" && Number(employee.points || 0) >= 160).length;
     return { total, warned, avgPoints, upcomingUpgrade };
   }, [employees]);
 
@@ -607,7 +607,7 @@ export default function ResourcePage() {
             <div className="employee-table-toolbar">
               <div>
                 <div className="card-title">Điểm & đánh giá nhân viên</div>
-                <div className="card-subtitle">Sắp xếp theo điểm tích lũy, 1000 điểm là mốc lên cấp.</div>
+                <div className="card-subtitle">Sắp xếp theo điểm tích lũy, 200 điểm là mốc lên cấp.</div>
               </div>
               <div className="search-box">
                 <Search size={16} />

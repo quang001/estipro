@@ -839,15 +839,16 @@ export default function ProjectDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [projectDoc, employeeDocs, categoryDocs, suggestionData, historyData] = await Promise.all([
+      const [projectDoc, employeeDocs, categoryDocs, suggestionData, historyData, settingsData] = await Promise.all([
         backendApi.project(id),
         backendApi.employees(),
         backendApi.categories(),
         backendApi.suggestAssignments(id).catch(() => ({ goi_y: [] })),
         backendApi.projectScoreHistory(id).catch(() => []),
+        backendApi.systemSettings().catch(() => null),
       ]);
       setProject(projectDoc);
-      setProfit(projectDoc?.uoc_tinh?.ty_le_loi_nhuan ?? 25);
+      setProfit(projectDoc?.uoc_tinh?.ty_le_loi_nhuan ?? settingsData?.profitMargin ?? 25);
       setEmployees(employeeDocs.map(mapEmployee));
       setCategories(categoryDocs || []);
       setSuggestions(suggestionData?.goi_y || projectDoc?.uoc_tinh?.phan_cong_goi_y || []);

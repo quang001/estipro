@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import AccountSettingsForm from "./AccountSettingsForm";
 import BackendConfigPanel from "./BackendConfigPanel";
-import { ROLES } from "../../services/api";
+import { ROLES, backendApi, getErrorMessage } from "../../services/api";
 import "../../styles/pages/settings/SettingsPage.css";
 
 const InputField = ({ label, value, onChange, step, unit, disabled }) => (
@@ -63,6 +63,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("account");
   const [toast, setToast] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const [settings, setSettings] = useState({
     // Finance (SUPER_ADMIN)
@@ -73,8 +74,8 @@ export default function SettingsPage() {
     // HR rules (SUPER_ADMIN)
     bonusDeltaUp: 2,
     bonusDeltaDown: 2,
-    promotionThreshold: 1000,
-    demotionZeroStar: 3,
+    promotionThreshold: 200,
+    demotionZeroStar: 5,
     // Workflow (MANAGER+)
     dailyReview: true,
     maxReviewRounds: 2,
@@ -122,10 +123,42 @@ export default function SettingsPage() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const handleSave = () => {
+  useEffect(() => {
+    let cancelled = false;
+    backendApi
+      .systemSettings()
+      .then((data) => {
+        if (!cancelled) setSettings((current) => ({ ...current, ...data }));
+      })
+      .catch((err) => {
+        if (!cancelled) setToast({ type: "lock", msg: getErrorMessage(err, "Không tải được cài đặt hệ thống") });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    if (effectiveTab === "finance") {
+      setSavingSettings(true);
+      try {
+        const savedSettings = await backendApi.updateSystemSettings(settings);
+        setSettings((current) => ({ ...current, ...savedSettings }));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        setToast({ type: "success", msg: "Đã lưu cài đặt hệ thống." });
+      } catch (err) {
+        setToast({ type: "lock", msg: getErrorMessage(err, "Không lưu được cài đặt hệ thống") });
+      } finally {
+        setSavingSettings(false);
+      }
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    setToast({ type: "success", msg: "Đã lưu cài đặt (mock)." });
+    setToast({ type: "success", msg: "Đã lưu cài đặt giao diện." });
   };
 
   // Hàm Helper giúp thay đổi state gọn gàng hơn
@@ -161,9 +194,10 @@ export default function SettingsPage() {
           type={effectiveTab === "account" ? "submit" : "button"}
           form={effectiveTab === "account" ? "account-settings-form" : undefined}
           onClick={effectiveTab === "account" ? undefined : handleSave}
+          disabled={savingSettings}
           style={{ width: 160, justifyContent: "center" }}
         >
-          {saved && effectiveTab !== "account" ? "✓ Đã lưu" : (<><Save size={16} /> Lưu thay đổi</>)}
+          {savingSettings ? "Đang lưu..." : saved && effectiveTab !== "account" ? "✓ Đã lưu" : (<><Save size={16} /> Lưu thay đổi</>)}
         </button>
       </div>
 

@@ -250,7 +250,7 @@ export function mapEmployee(doc) {
   const level = doc?.cap_do_ten || doc?.ma_cap_do?.ten_cap_do || "junior";
   const score = Number(doc?.diem_tich_luy || 0);
   const quality = doc?.diem_tb ?? doc?.diem_trung_binh ?? 0;
-  const skill = level === "expert" || level === "senior" || score >= 1000 ? "high" : level === "mid" || score >= 500 ? "medium" : "low";
+  const skill = level === "expert" || level === "senior" || score >= 200 ? "high" : level === "mid" || score >= 100 ? "medium" : "low";
 
   return {
     id: doc?._id,
@@ -340,6 +340,8 @@ export const backendApi = {
   revenue: () => api.get("/bao-cao/doanh-thu").then((res) => res.data),
   performance: () => api.get("/bao-cao/hieu-suat").then((res) => res.data),
   aiInsights: () => api.get("/bao-cao/ai-insights").then((res) => res.data),
+  systemSettings: () => api.get("/system-settings").then((res) => res.data),
+  updateSystemSettings: (payload) => api.put("/system-settings", payload).then((res) => res.data),
 
   projects: (params) => api.get("/du-an", { params }).then((res) => res.data),
   project: (id) => api.get(`/du-an/${id}`).then((res) => res.data),
@@ -347,7 +349,10 @@ export const backendApi = {
   updateProject: (id, payload) => api.put(`/du-an/${id}`, payload).then((res) => res.data),
   deleteProject: (id) => api.delete(`/du-an/${id}`).then((res) => res.data),
   updateProjectStatus: (id, trang_thai) => api.patch(`/du-an/${id}/trang-thai`, { trang_thai }).then((res) => res.data),
-  estimateProject: (id, ty_le_loi_nhuan = 25) => api.post(`/du-an/${id}/uoc-tinh`, { ty_le_loi_nhuan }).then((res) => res.data),
+  estimateProject: (id, ty_le_loi_nhuan) => {
+    const payload = ty_le_loi_nhuan === undefined || ty_le_loi_nhuan === null ? {} : { ty_le_loi_nhuan };
+    return api.post(`/du-an/${id}/uoc-tinh`, payload).then((res) => res.data);
+  },
   analyzeProjectAi: (id) => api.post(`/du-an/${id}/ai-estimation/analyze`, {}, { timeout: 60000 }).then((res) => res.data),
   confirmProjectAi: (id, payload) => api.post(`/du-an/${id}/ai-estimation/confirm`, payload, { timeout: 60000 }).then((res) => res.data),
   analyzeBriefImage: (file) => api.post("/du-an/ai-estimation/ocr", file, {

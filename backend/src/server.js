@@ -42,6 +42,7 @@ app.use('/api/cap-do', require('./routes/capDo.routes'));
 app.use('/api/bao-cao', require('./routes/baoCao.routes'));
 app.use('/api/loai-du-an', require('./routes/projectCategory.routes'));
 app.use('/api/project-requirements', require('./routes/projectRequirement.routes'));
+app.use('/api/system-settings', require('./routes/systemSettings.routes'));
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 

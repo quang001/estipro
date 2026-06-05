@@ -8,7 +8,8 @@
     "seed": "node src/seed/seeder.js",
     "seed:categories": "node src/seed/seedCategories.js",
     "seed:requirements": "node src/seed/seedRequirementFields.js",
-    "migrate:loai-du-an": "node src/seed/migrateLoaiDuAn.js"
+    "migrate:loai-du-an": "node src/seed/migrateLoaiDuAn.js",
+    "normalize:employee-levels": "node src/scripts/normalizeEmployeeLevels.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

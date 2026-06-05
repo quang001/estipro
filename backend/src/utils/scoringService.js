@@ -10,6 +10,7 @@ const DuAn          = require('../models/DuAn.model');
 const LichSuDiem    = require('../models/LichSuDiem.model');
 // const { tinhDiemDuAn: calcDiem, apDungDiem } = require('./scoringEngine');
 const { tinhDiemDuAn: _tinhDiem, apDungDiem } = require('./scoringEngine');
+const { getSystemSettings } = require('../services/systemSettings.service');
 
 /**
  * Tính điểm + lưu DB cho toàn bộ nhân viên trong 1 dự án
@@ -63,7 +64,8 @@ async function tinhDiemDuAn(duAnId, { soSao, soNgayTre = 0, soLanSua = 0, tyLeDo
   const penalty = { tre_deadline: soNgayTre > 0,   bi_sua_nhieu: soLanSua >= 3  };
 
   // Chạy engine
-  const ketQua = _tinhDiem({ so_sao: soSao, phanCongs: phanCongData, bonus, penalty });
+  const systemSettings = await getSystemSettings();
+  const ketQua = _tinhDiem({ so_sao: soSao, phanCongs: phanCongData, bonus, penalty, rules: systemSettings });
 
   // Cập nhật ty_le_dong_gop ngược lại vào DB
   for (const pc of phanCongs) {
@@ -88,7 +90,7 @@ async function tinhDiemDuAn(duAnId, { soSao, soNgayTre = 0, soLanSua = 0, tyLeDo
 
     nv._capDoTen = nv.ma_cap_do?.ten_cap_do || 'junior';
     const { upgraded, downgraded, cap_do_truoc, cap_do_sau } =
-      apDungDiem(nv, emp.diem_nhan, soSao, capDoMap);
+      apDungDiem(nv, emp.diem_nhan, soSao, capDoMap, systemSettings);
 
     // Lưu nhân viên
     await NhanVien.findByIdAndUpdate(emp.ma_nhan_vien, {

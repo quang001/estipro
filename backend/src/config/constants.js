@@ -24,7 +24,7 @@ const TRANG_THAI_LAM_VIEC = ['available', 'busy', 'on_leave', 'inactive'];
 // ─── Scoring constants ─────────────────────────────────────────────────────
 const SCORING = {
   BASE_SCORE:      10,
-  DIEM_LEN_CAP:    1000,
+  DIEM_LEN_CAP:    200,
   LAN_0_SAO_PHAT:  5,
   BONUS:   { dung_deadline: 2, khong_bi_sua: 3 },
   PENALTY: { tre_deadline: -2, bi_sua_nhieu: -3 },
