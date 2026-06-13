@@ -538,11 +538,15 @@ function TechnicalCostModal({ project, onClose, onSaved }) {
   );
 }
 
-function getCompletionScorePreview(form, employeeCount) {
+function getCompletionScorePreview(form, employeeCount, rules = {}) {
   const stars = numberInput(form.so_sao);
   const projectScore = 10 * (RATING_PCT[stars] ?? 0);
-  const bonus = (numberInput(form.so_ngay_tre_deadline) === 0 ? 2 : 0) + (numberInput(form.so_lan_sua_thuc_te) === 0 ? 3 : 0);
-  const penalty = (numberInput(form.so_ngay_tre_deadline) > 0 ? 2 : 0) + (numberInput(form.so_lan_sua_thuc_te) >= 3 ? 3 : 0);
+  const rawBonusDelta = Number(rules.bonusDeltaUp);
+  const rawPenaltyDelta = Number(rules.bonusDeltaDown);
+  const bonusDelta = Number.isFinite(rawBonusDelta) ? rawBonusDelta : 5;
+  const penaltyDelta = Number.isFinite(rawPenaltyDelta) ? rawPenaltyDelta : 5;
+  const bonus = numberInput(form.so_ngay_tre_deadline) === 0 || numberInput(form.so_lan_sua_thuc_te) === 0 ? bonusDelta : 0;
+  const penalty = numberInput(form.so_ngay_tre_deadline) > 0 || numberInput(form.so_lan_sua_thuc_te) >= 3 ? penaltyDelta : 0;
   const perEmployee = employeeCount > 0 ? Math.max(0, projectScore / employeeCount + bonus - penalty) : 0;
 
   return { projectScore, bonus, penalty, perEmployee };
@@ -575,11 +579,24 @@ function CompleteModal({ project, onClose, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [systemSettings, setSystemSettings] = useState({ bonusDeltaUp: 5, bonusDeltaDown: 5 });
+
+  useEffect(() => {
+    let cancelled = false;
+    backendApi.systemSettings()
+      .then((data) => {
+        if (!cancelled) setSystemSettings((current) => ({ ...current, ...data }));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const totalRatio = form.ty_le_dong_gop.reduce((sum, item) => sum + Number(item.ty_le || 0), 0);
   const ratioInvalid = form.ty_le_dong_gop.length > 0 && Math.abs(totalRatio - 1) > 0.01;
   const actualProfit = numberInput(form.gia_ban_thuc_te) - numberInput(form.tong_chi_phi_thuc_te);
-  const scorePreview = getCompletionScorePreview(form, assignments.length);
+  const scorePreview = getCompletionScorePreview(form, assignments.length, systemSettings);
 
   const setEvenContribution = () => {
     const share = form.ty_le_dong_gop.length ? Number((1 / form.ty_le_dong_gop.length).toFixed(4)) : 1;

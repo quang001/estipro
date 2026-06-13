@@ -68,9 +68,6 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     // Finance (SUPER_ADMIN)
     profitMargin: 25,
-    renderCostPerHour: 15,
-    softwareLicense: 45,
-    payrollCoeff: 1.5,
     // HR rules (SUPER_ADMIN)
     bonusDeltaUp: 2,
     bonusDeltaDown: 2,
@@ -335,18 +332,16 @@ export default function SettingsPage() {
           {effectiveTab === "finance" && (
             <div className="card hover-lift reveal is-visible" data-reveal>
               <div className="card-title" style={{ display: "flex", gap: 8 }}>
-                <CreditCard size={18} color="#10b981" /> Tài chính & Costing
+                <CreditCard size={18} color="#10b981" /> Tai chinh & HR Rules
               </div>
-              <div className="card-subtitle">Thiết lập chi phí nền tảng, margin và tham số HR (SUPER_ADMIN)</div>
+              <div className="card-subtitle">Thiet lap ti le loi nhuan mac dinh va quy tac diem nhan su (SUPER_ADMIN)</div>
               <div className="card-divider" />
 
               <div className="settings-split">
                 <div className="card hover-lift settings-mini">
                   <div className="settings-mini-title">
-                    <CreditCard size={16} /> Nền tảng
+                    <CreditCard size={16} /> Tai chinh
                   </div>
-                  <InputField label="Render Farm" value={settings.renderCostPerHour} onChange={(e) => handleSettingChange("renderCostPerHour", e.target.value)} step={1} unit="₫K/giờ" />
-                  <InputField label="Software license" value={settings.softwareLicense} onChange={(e) => handleSettingChange("softwareLicense", e.target.value)} step={5} unit="triệu/tháng" />
                   <InputField label="Profit margin target" value={settings.profitMargin} onChange={(e) => handleSettingChange("profitMargin", e.target.value)} step={1} unit="%" />
                 </div>
 
@@ -354,21 +349,20 @@ export default function SettingsPage() {
                   <div className="settings-mini-title">
                     <Target size={16} /> HR Rules
                   </div>
-                  <InputField label="Payroll coefficient" value={settings.payrollCoeff} onChange={(e) => handleSettingChange("payrollCoeff", e.target.value)} step={0.1} unit="x" />
-                  <InputField label="Bonus Delta Tăng" value={settings.bonusDeltaUp} onChange={(e) => handleSettingChange("bonusDeltaUp", e.target.value)} step={1} unit="điểm/bậc" />
-                  <InputField label="Bonus Delta Giảm" value={settings.bonusDeltaDown} onChange={(e) => handleSettingChange("bonusDeltaDown", e.target.value)} step={1} unit="điểm/bậc" />
-                  <InputField label="Thăng chức" value={settings.promotionThreshold} onChange={(e) => handleSettingChange("promotionThreshold", e.target.value)} step={50} unit="điểm" />
+                  <InputField label="Bonus Delta Tang" value={settings.bonusDeltaUp} onChange={(e) => handleSettingChange("bonusDeltaUp", e.target.value)} step={1} unit="diem" />
+                  <InputField label="Bonus Delta Giam" value={settings.bonusDeltaDown} onChange={(e) => handleSettingChange("bonusDeltaDown", e.target.value)} step={1} unit="diem" />
+                  <InputField label="Thang chuc" value={settings.promotionThreshold} onChange={(e) => handleSettingChange("promotionThreshold", e.target.value)} step={50} unit="diem" />
                 </div>
               </div>
 
               <div className="cost-preview">
-                <div className="preview-box blue">
-                  <div className="val">₫{settings.renderCostPerHour * 160}K</div>
-                  <div className="lbl">Ước tính Render/tháng</div>
-                </div>
                 <div className="preview-box green">
                   <div className="val">{settings.profitMargin}%</div>
-                  <div className="lbl">Mục tiêu lợi nhuận</div>
+                  <div className="lbl">Muc tieu loi nhuan</div>
+                </div>
+                <div className="preview-box blue">
+                  <div className="val">{settings.promotionThreshold}</div>
+                  <div className="lbl">Diem len cap</div>
                 </div>
               </div>
             </div>

@@ -242,7 +242,7 @@ async function _autoUocTinh(duAnId, duAn, tyLeLoiNhuan = null, options = {}) {
       ? mergeAiReviewedDifficulty(systemDoKhoResult, yeuCau)
       : systemDoKhoResult;
     const gioCoBan = category?.base_hours ?? category?.gio_co_ban ?? 8;
-    const tongKT = tinhChiPhiKyThuat(category, yeuCau, chiPhiKTDoc?.toObject?.() || null, systemSettings);
+    const tongKT = tinhChiPhiKyThuat(category, yeuCau, chiPhiKTDoc?.toObject?.() || null);
     const { pct: pctRuiRo, reasons } = tinhRuiRo(category, yeuCau, diemDoKho);
 
     const phanCongData = phanCong.map(pc => ({

@@ -56,7 +56,7 @@ function sumManualTechnicalCost(chiPhiKyThuatManual = null) {
   return total > 0 ? total : null;
 }
 
-function tinhChiPhiKyThuat(category, yeuCau, chiPhiKyThuatManual = null, systemSettings = {}) {
+function tinhChiPhiKyThuat(category, yeuCau, chiPhiKyThuatManual = null) {
   // Nếu đã nhập thủ công → dùng luôn
   const manualTotal = sumManualTechnicalCost(chiPhiKyThuatManual);
   if (manualTotal !== null) return manualTotal;
@@ -64,17 +64,6 @@ function tinhChiPhiKyThuat(category, yeuCau, chiPhiKyThuatManual = null, systemS
   const slug = category?.slug || 'khac';
   // Ưu tiên lấy từ DB, fallback về RATE_CARD
   let base = category?.tech_cost_base ?? _fallback(slug).tech_cost_base ?? 100000;
-  const gioCoBan = Number(category?.base_hours ?? category?.gio_co_ban ?? _fallback(slug).base_hours ?? 8);
-  const renderRate = Math.max(Number(systemSettings.renderCostPerHour) || 0, 0) * 1000;
-  const softwareMonthly = Math.max(Number(systemSettings.softwareLicense) || 0, 0) * 1000000;
-
-  if (renderRate > 0 || softwareMonthly > 0) {
-    const softwareHourly = softwareMonthly > 0 ? softwareMonthly / 160 : 0;
-    const renderHours = ['animation_3d', 'vfx', 'animation_2d', 'motion_graphics'].includes(slug)
-      ? Math.max(1, (Number(yeuCau?.thoi_luong_giay) || 30) / 15)
-      : Math.max(0.25, gioCoBan * 0.08);
-    base += (softwareHourly * gioCoBan) + (renderRate * renderHours);
-  }
 
   // Điều chỉnh theo chất lượng output
   if (yeuCau?.do_phan_giai === '4K')      base *= 2;

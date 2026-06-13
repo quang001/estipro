@@ -2,9 +2,6 @@ const SystemSettings = require('../models/SystemSettings.model');
 
 const DEFAULT_SYSTEM_SETTINGS = {
   profitMargin: 25,
-  renderCostPerHour: 15,
-  softwareLicense: 45,
-  payrollCoeff: 1.5,
   bonusDeltaUp: 2,
   bonusDeltaDown: 2,
   promotionThreshold: 200,
@@ -34,7 +31,7 @@ function sanitizeSettings(payload = {}) {
   if (next.promotionThreshold !== undefined) next.promotionThreshold = Math.max(next.promotionThreshold, 1);
   if (next.demotionZeroStar !== undefined) next.demotionZeroStar = Math.max(Math.round(next.demotionZeroStar), 1);
 
-  ['renderCostPerHour', 'softwareLicense', 'payrollCoeff', 'bonusDeltaUp', 'bonusDeltaDown'].forEach((field) => {
+  ['bonusDeltaUp', 'bonusDeltaDown'].forEach((field) => {
     if (next[field] !== undefined) next[field] = Math.max(next[field], 0);
   });
 

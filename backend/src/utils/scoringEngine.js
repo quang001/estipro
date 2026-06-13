@@ -22,14 +22,8 @@ function resolveScoringRules(rules = {}) {
     baseScore: Number(rules.baseScore) || BASE_SCORE,
     promotionThreshold: Math.max(Number(rules.promotionThreshold) || DIEM_LEN_CAP, 1),
     demotionZeroStar: Math.max(Math.round(Number(rules.demotionZeroStar) || LAN_0_SAO_PHAT), 1),
-    bonus: {
-      dung_deadline: Number.isFinite(bonusUp) ? bonusUp : BONUS.dung_deadline,
-      khong_bi_sua: Number.isFinite(bonusUp) ? bonusUp : BONUS.khong_bi_sua,
-    },
-    penalty: {
-      tre_deadline: -(Number.isFinite(bonusDown) ? bonusDown : Math.abs(PENALTY.tre_deadline)),
-      bi_sua_nhieu: -(Number.isFinite(bonusDown) ? bonusDown : Math.abs(PENALTY.bi_sua_nhieu)),
-    },
+    bonusDeltaUp: Number.isFinite(bonusUp) ? bonusUp : (BONUS.dung_deadline + BONUS.khong_bi_sua),
+    bonusDeltaDown: Number.isFinite(bonusDown) ? bonusDown : Math.abs(PENALTY.tre_deadline + PENALTY.bi_sua_nhieu),
   };
 }
 
@@ -52,10 +46,8 @@ function tinhDiemDuAn({ so_sao, phanCongs, bonus = {}, penalty = {}, rules = {} 
   }
 
   let bonusDiem = 0;
-  if (bonus.dung_deadline)  bonusDiem += scoringRules.bonus.dung_deadline;
-  if (bonus.khong_bi_sua)   bonusDiem += scoringRules.bonus.khong_bi_sua;
-  if (penalty.tre_deadline) bonusDiem += scoringRules.penalty.tre_deadline;
-  if (penalty.bi_sua_nhieu) bonusDiem += scoringRules.penalty.bi_sua_nhieu;
+  if (bonus.dung_deadline || bonus.khong_bi_sua) bonusDiem += scoringRules.bonusDeltaUp;
+  if (penalty.tre_deadline || penalty.bi_sua_nhieu) bonusDiem -= scoringRules.bonusDeltaDown;
 
   const employees = phanCongsNorm.map(p => ({
     ma_nhan_vien:   p.ma_nhan_vien,

@@ -18,7 +18,7 @@ import "../../styles/pages/employees/ResourcePage.css";
 
 const SKILL_COLORS = { high: "#10b981", medium: "#f59e0b", low: "#ef4444" };
 const LEVEL_COLORS = { junior: "#38bdf8", mid: "#10b981", senior: "#f59e0b", expert: "#8b5cf6" };
-const POINTS_TO_LEVEL = 200;
+const DEFAULT_POINTS_TO_LEVEL = 200;
 const ASSIGNMENT_PREVIEW_LIMIT = 10;
 
 const Stars = ({ value }) => (
@@ -419,16 +419,19 @@ export default function ResourcePage() {
   const [scoreEmployee, setScoreEmployee] = useState(null);
   const [showAllAssignmentEmployees, setShowAllAssignmentEmployees] = useState(false);
   const [showAllAssignmentSlots, setShowAllAssignmentSlots] = useState(false);
+  const [systemSettings, setSystemSettings] = useState({ promotionThreshold: DEFAULT_POINTS_TO_LEVEL });
+  const pointsToLevel = Math.max(Number(systemSettings.promotionThreshold) || DEFAULT_POINTS_TO_LEVEL, 1);
 
   const loadData = async () => {
     setLoading(true);
     setError("");
     try {
-      const [employeeDocs, projectDocs, levelDocs, skillDocs] = await Promise.all([
+      const [employeeDocs, projectDocs, levelDocs, skillDocs, settingsDoc] = await Promise.all([
         backendApi.employees(),
         backendApi.projects(),
         backendApi.levels(),
         backendApi.skills(),
+        backendApi.systemSettings().catch(() => null),
       ]);
       const activeDocs = projectDocs.filter((project) => !["completed", "cancelled"].includes(project.trang_thai)).slice(0, 24);
       const detailDocs = await Promise.all(activeDocs.map((project) => backendApi.project(project._id).catch(() => project)));
@@ -442,6 +445,7 @@ export default function ResourcePage() {
       setSkills(skillDocs);
       setProjects(mappedProjects);
       setAssignments(nextAssignments);
+      if (settingsDoc) setSystemSettings((current) => ({ ...current, ...settingsDoc }));
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được dữ liệu nhân sự"));
     } finally {
@@ -473,9 +477,9 @@ export default function ResourcePage() {
     const total = employees.length;
     const warned = employees.filter((employee) => Number(employee.raw?.so_lan_0_sao || employee.raw?.so_lan_0_sao_lien_tiep || 0) >= 3).length;
     const avgPoints = total ? Math.round(employees.reduce((sum, employee) => sum + Number(employee.points || 0), 0) / total) : 0;
-    const upcomingUpgrade = employees.filter((employee) => employee.level !== "expert" && Number(employee.points || 0) >= 160).length;
+    const upcomingUpgrade = employees.filter((employee) => employee.level !== "expert" && Number(employee.points || 0) >= pointsToLevel * 0.8).length;
     return { total, warned, avgPoints, upcomingUpgrade };
-  }, [employees]);
+  }, [employees, pointsToLevel]);
 
   const urgencyLabel = { high: "Gấp", medium: "Bình thường", low: "Thấp" };
 
@@ -607,7 +611,7 @@ export default function ResourcePage() {
             <div className="employee-table-toolbar">
               <div>
                 <div className="card-title">Điểm & đánh giá nhân viên</div>
-                <div className="card-subtitle">Sắp xếp theo điểm tích lũy, 200 điểm là mốc lên cấp.</div>
+                <div className="card-subtitle">Sắp xếp theo điểm tích lũy, {pointsToLevel} điểm là mốc lên cấp.</div>
               </div>
               <div className="search-box">
                 <Search size={16} />
@@ -635,7 +639,7 @@ export default function ResourcePage() {
                     const warning = zeroStars >= 3;
                     const isExpert = employee.level === "expert";
                     const color = LEVEL_COLORS[employee.level] || "#4facfe";
-                    const pct = Math.min(100, Math.round((Number(employee.points || 0) / POINTS_TO_LEVEL) * 100));
+                    const pct = Math.min(100, Math.round((Number(employee.points || 0) / pointsToLevel) * 100));
                     return (
                       <tr key={employee.id} className={warning ? "is-warning" : ""}>
                         <td className="rank-cell">#{index + 1}</td>
@@ -669,7 +673,7 @@ export default function ResourcePage() {
                           </div>
                         </td>
                         <td className="progress-cell">
-                          <div className="score-progress-label">{isExpert ? "Cấp tối đa" : `${employee.points || 0} / ${POINTS_TO_LEVEL} (${pct}%)`}</div>
+                          <div className="score-progress-label">{isExpert ? "Cấp tối đa" : `${employee.points || 0} / ${pointsToLevel} (${pct}%)`}</div>
                           {!isExpert ? (
                             <div className="score-progress-track">
                               <div className="score-progress-fill" style={{ width: `${pct}%`, background: color }} />
