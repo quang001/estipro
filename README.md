@@ -24,7 +24,10 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 * Quản lý khách hàng và mức độ rủi ro của khách hàng
 * Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
 * Quản lý loại dự án động bằng database
-*
+** Quản lý dự án theo trạng thái: Draft, Quoted, Approved, In Progress, Review, Completed
+* Quản lý khách hàng và mức độ rủi ro của khách hàng
+* Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
+* Quản lý loại dự án động bằng database
 
 ---
 
