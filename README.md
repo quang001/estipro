@@ -29,6 +29,15 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 * Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
 * Quản lý loại dự án động bằng database
 
+*  🚀 Fullstack Web Developer 
+- 🌍 Based in Vietnam win 
+- 🚀 Fullstack Web Developer 
+- 🌍 Based in Vietnam win 
+- 🧠 Learning Backend Architecture & AI Integration
+- ⚡ Passionate about Web Development & AI
+- 🔥 Building Real-world Systems
+- 🎯 Goal: Become a Professional Fullstack Engineer
+
 ---
 
 ## 🧠 Công thức ước tính chi phí
