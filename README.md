@@ -20,15 +20,6 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 * Dashboard thống kê chi phí, lợi nhuận và hiệu suất
 * Hỗ trợ AI Estimation để phân tích mô tả dự án và gợi ý độ khó
 
-* Quản lý dự án theo trạng thái: Draft, Quoted, Approved, In Progress, Review, Completed
-* Quản lý khách hàng và mức độ rủi ro của khách hàng
-* Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
-* Quản lý loại dự án động bằng database
-** Quản lý dự án theo trạng thái: Draft, Quoted, Approved, In Progress, Review, Completed
-* Quản lý khách hàng và mức độ rủi ro của khách hàng
-* Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
-* Quản lý loại dự án động bằng database
-
 *  🚀 Fullstack Web Developer 
 - 🌍 Based in Vietnam win 
 - 🚀 Fullstack Web Developer 
