@@ -20,6 +20,18 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 * Dashboard thống kê chi phí, lợi nhuận và hiệu suất
 * Hỗ trợ AI Estimation để phân tích mô tả dự án và gợi ý độ khó
 
+* Quản lý dự án theo trạng thái: Draft, Quoted, Approved, In Progress, Review, Completed
+* Quản lý khách hàng và mức độ rủi ro của khách hàng
+* Quản lý nhân viên theo vai trò, cấp độ và lương theo giờ
+* Quản lý loại dự án động bằng database
+* Ước tính chi phí dự án tự động
+* Tính chi phí nhân sự, chi phí kỹ thuật, buffer rủi ro và lợi nhuận
+* Đánh giá độ khó dự án dựa trên yêu cầu kỹ thuật
+* Đề xuất phân công nhân viên theo từng loại dự án
+* Theo dõi điểm số, hiệu suất và cấp độ nhân viên
+* Dashboard thống kê chi phí, lợi nhuận và hiệu suất
+* Hỗ trợ AI Estimation để phân tích mô tả dự án và gợi ý độ khó
+
 ---
 
 ## 🧠 Công thức ước tính chi phí
