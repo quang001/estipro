@@ -32,6 +32,13 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 * Dashboard thống kê chi phí, lợi nhuận và hiệu suất
 * Hỗ trợ AI Estimation để phân tích mô tả dự án và gợi ý độ khó
 
+* - 🚀 Fullstack Web Developer 
+- 🌍 Based in Vietnam win 
+- 🧠 Learning Backend Architecture & AI Integration
+- ⚡ Passionate about Web Development & AI
+- 🔥 Building Real-world Systems
+- 🎯 Goal: Become a Professional Fullstack Engineer
+
 ---
 
 ## 🧠 Công thức ước tính chi phí
