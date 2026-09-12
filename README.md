@@ -26,6 +26,12 @@ Hệ thống hỗ trợ quản lý dự án, khách hàng, nhân viên, loại d
 - 🧠 Learning Backend Architecture & AI Integration
 - ⚡ Passionate about Web Development & AI
 - 🔥 Building Real-world Systems
+- - 🚀 Fullstack Web Developer 
+- 🌍 Based in Vietnam win 
+- 🧠 Learning Backend Architecture & AI Integration
+- ⚡ Passionate about Web Development & AI
+- 🔥 Building Real-world Systems
+- 🎯 Goal: Become a Professional Fullstack Engineer
 - 🎯 Goal: Become a Professional Fullstack Engineer
 
 ---
